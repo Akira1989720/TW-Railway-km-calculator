@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>台灣鐵路捷運里程查詢</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Space+Mono:wght@400;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+<style>
+/* =========================================================
+   台灣鐵路捷運里程查詢  —  單一檔案 / 純 HTML+CSS+JS
+   設計：夜間月台資訊看板 (Platform Departure Board)
+   ========================================================= */
+:root{
+  --bg:#0d0f14; --bg-2:#14171f; --panel:#191d27; --panel-2:#212633;
+  --line:#2c3340; --ink:#f3f5f8; --ink-dim:#9aa4b4; --ink-faint:#5f6b7d;
+  --chip-bg:rgba(255,255,255,.05); --glow-top:rgba(255,255,255,.04);
+  --board-bg:#0e1118; --board-bg2:#0b0d12; --scan:rgba(255,255,255,.012);
+  --board-ink:#f3f5f8; --board-ink-dim:#9aa4b4; --board-faint:#5f6b7d;
+  --accent:#e8b13a; --accent-soft:rgba(232,177,58,.14); --accent-line:rgba(232,177,58,.45);
+  --custom-c:#e8b13a;
+  --radius:14px; --shadow:0 18px 50px -20px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box;} html,body{margin:0;padding:0;}
+body{
+  font-family:"Noto Sans TC","Bricolage Grotesque",system-ui,sans-serif;
+  background:
+    radial-gradient(1200px 700px at 75% -10%, var(--glow-top), transparent 60%),
+    radial-gradient(900px 600px at 0% 110%, var(--accent-soft), transparent 55%),
+    var(--bg);
+  color:var(--ink); min-height:100vh; overflow-x:hidden; -webkit-font-smoothing:antialiased; transition:background .5s ease;
+}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+.wrap{position:relative;z-index:1;max-width:780px;margin:0 auto;padding:32px 20px 80px;}
+
+header{margin-bottom:24px;}
+.kicker{font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.32em;text-transform:uppercase;
+  color:var(--accent);display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.kicker::before{content:"";width:26px;height:2px;background:var(--accent);display:inline-block;}
+h1{font-family:"Bricolage Grotesque","Noto Sans TC",sans-serif;font-weight:800;
+  font-size:clamp(24px,7.2vw,46px);line-height:1.05;margin:0;letter-spacing:-.01em;white-space:nowrap;}
+.sub{color:var(--ink-dim);font-size:clamp(9px,2.55vw,14px);margin-top:10px;line-height:1.6;
+  white-space:nowrap;letter-spacing:-.01em;}
+
+/* 主題選擇列 */
+.theme-bar{display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap;}
+.tlabel{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink-faint);margin-right:2px;}
+.sw{appearance:none;border:1px solid var(--line);background:var(--panel);width:30px;height:30px;
+  border-radius:50%;padding:0;cursor:pointer;display:grid;place-items:center;position:relative;overflow:hidden;
+  transition:transform .15s ease,box-shadow .15s ease;}
+.sw:hover{transform:translateY(-2px);}
+.sw.active{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent);}
+.sw i{width:20px;height:20px;border-radius:50%;display:block;}
+.sw-auto{background:conic-gradient(#e2231a,#f08300,#86c540,#0070bd,#7a3df0,#e3002c);}
+.sw-cyber{background:linear-gradient(135deg,#ff2bd6,#00f0ff);}
+.sw-earth{background:linear-gradient(135deg,#b5651d,#7a7a3a,#d8c9a3);}
+.sw-anime{background:linear-gradient(135deg,#ff5d9e,#7ec8ff);}
+.sw-custom{overflow:visible;}
+.sw-custom input[type=color]{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;padding:0;cursor:pointer;}
+.sw-ring{width:20px;height:20px;border-radius:50%;position:relative;
+  background:conic-gradient(red,#ff0,#0f0,#0ff,#00f,#f0f,red);}
+.sw-ring::after{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--custom-c);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.25);}
+
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0 0;}
+.tab{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink-dim);
+  font-family:inherit;font-weight:700;font-size:14px;padding:10px 15px;border-radius:11px;cursor:pointer;
+  display:flex;align-items:center;gap:8px;transition:all .18s ease;}
+.tab:hover{color:var(--ink);border-color:var(--ink-faint);transform:translateY(-1px);}
+.tab .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+.tab.active{background:var(--accent-soft);border-color:var(--accent-line);color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--accent-line);}
+
+/* 路線選擇器（通用：>1 條才顯示） */
+.routes{display:none;flex-wrap:wrap;gap:7px;margin-top:14px;}
+.routes.show{display:flex;}
+.routes .rlabel{width:100%;font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--ink-faint);margin-bottom:2px;}
+.route{appearance:none;border:1px solid var(--line);background:transparent;color:var(--ink-dim);
+  font-family:inherit;font-weight:700;font-size:13px;padding:7px 13px;border-radius:20px;cursor:pointer;
+  display:flex;align-items:center;gap:7px;transition:all .16s ease;}
+.route .dot{width:8px;height:8px;border-radius:50%;}
+.route:hover{color:var(--ink);}
+.route.active{color:var(--ink);border-color:currentColor;box-shadow:inset 0 0 0 1px currentColor;}
+
+.notice{display:none;margin-top:16px;padding:11px 14px;border-radius:11px;
+  background:var(--chip-bg);border:1px solid var(--line);color:var(--ink-dim);font-size:12.5px;line-height:1.55;}
+.notice.show{display:block;} .notice b{color:var(--ink);}
+.notice .tag{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;}
+
+.card{margin-top:20px;background:linear-gradient(180deg,var(--panel),var(--bg-2));
+  border:1px solid var(--line);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);}
+.field-row{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:end;}
+@media(max-width:560px){.field-row{grid-template-columns:1fr;}.swap-cell{justify-self:center;margin:2px 0;}}
+.field label{display:block;font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px;}
+.field label .pin{color:var(--accent);}
+
+.combo{position:relative;}
+.combo input{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+  font-family:inherit;font-size:16px;font-weight:500;padding:13px 14px;border-radius:11px;outline:none;
+  transition:border-color .15s ease,box-shadow .15s ease;}
+.combo input::placeholder{color:var(--ink-faint);font-weight:400;}
+.combo input:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft);}
+.combo.has-value input{font-weight:700;}
+.options{position:absolute;z-index:30;top:calc(100% + 6px);left:0;right:0;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:12px;max-height:300px;overflow-y:auto;
+  box-shadow:0 22px 44px -18px rgba(0,0,0,.85);display:none;padding:5px;}
+.options.show{display:block;}
+.opt{display:flex;align-items:center;gap:11px;padding:10px;border-radius:9px;cursor:pointer;
+  color:var(--ink);font-size:15px;}
+.opt:hover,.opt.kbd{background:var(--accent-soft);}
+.opt .km{margin-left:auto;font-family:"Space Mono",monospace;font-size:12px;color:var(--ink-faint);}
+.opt-empty{padding:14px 12px;color:var(--ink-faint);font-size:14px;text-align:center;}
+
+.code{flex:0 0 auto;min-width:38px;height:24px;padding:0 7px;border-radius:13px;display:inline-flex;
+  align-items:center;justify-content:center;font-family:"Space Mono",monospace;font-weight:700;
+  font-size:12px;color:#fff;letter-spacing:.02em;line-height:1;background:var(--accent);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+.pdot{flex:0 0 auto;width:11px;height:11px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft);}
+
+.swap-cell{display:flex;align-items:end;height:100%;padding-bottom:3px;}
+.swap{appearance:none;width:46px;height:46px;border-radius:12px;cursor:pointer;background:var(--panel-2);
+  border:1px solid var(--line);color:var(--accent);display:flex;align-items:center;justify-content:center;
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1),border-color .15s,background .15s;}
+.swap:hover{border-color:var(--accent-line);background:var(--accent-soft);}
+.swap:active{transform:rotate(180deg) scale(.94);}
+.swap svg{width:20px;height:20px;}
+
+.board{margin-top:18px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line);
+  background:repeating-linear-gradient(180deg,var(--scan) 0 2px,transparent 2px 4px),
+    linear-gradient(180deg,var(--board-bg),var(--board-bg2));}
+.board-inner{padding:26px 24px;text-align:center;}
+.board .state{color:var(--board-faint);font-size:14px;padding:34px 0;}
+.board .route-line{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+  color:var(--board-ink-dim);font-size:14px;margin-bottom:6px;}
+.board .route-line .stn{display:inline-flex;align-items:center;gap:7px;color:var(--board-ink);font-weight:500;}
+.board .route-line .arrow{color:var(--accent);font-family:"Space Mono",monospace;}
+.readout{font-family:"Space Mono",monospace;font-weight:700;font-size:clamp(56px,18vw,104px);
+  line-height:1;letter-spacing:-.02em;color:var(--accent);text-shadow:0 0 28px var(--accent-soft);margin:8px 0 2px;}
+.readout .unit{font-size:.30em;color:var(--board-ink-dim);margin-left:8px;letter-spacing:.04em;}
+.meta{display:inline-flex;gap:18px;margin-top:14px;flex-wrap:wrap;justify-content:center;
+  font-family:"Space Mono",monospace;font-size:12px;color:var(--board-faint);letter-spacing:.08em;}
+.meta b{color:var(--board-ink-dim);font-weight:700;}
+
+footer{margin-top:30px;color:var(--ink-faint);font-size:12px;line-height:1.7;}
+footer code{font-family:"Space Mono",monospace;color:var(--ink-dim);}
+a{color:var(--accent);text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Taiwan Rail · Mileage</div>
+    <h1>台灣鐵路捷運里程查詢</h1>
+    <p class="sub">選擇系統與路線，輸入或搜尋出發、到達站，立即得到兩站里程（公里，保留一位小數）。</p>
+    <div class="theme-bar" id="themeBar">
+      <span class="tlabel">主題</span>
+      <button class="sw" data-theme="auto"  title="依路線"><i class="sw-auto"></i></button>
+      <button class="sw" data-theme="cyber" title="賽博龐克風"><i class="sw-cyber"></i></button>
+      <button class="sw" data-theme="earth" title="大地色系風"><i class="sw-earth"></i></button>
+      <button class="sw" data-theme="anime" title="日本動漫風"><i class="sw-anime"></i></button>
+      <label class="sw sw-custom" data-theme="custom" title="自訂顏色（光譜）">
+        <input type="color" id="customColor" value="#e8b13a" />
+        <i class="sw-ring"></i>
+      </label>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs"></nav>
+  <div class="routes" id="routes"></div>
+  <div class="notice" id="notice"></div>
+
+  <div class="card">
+    <div class="field-row">
+      <div class="field">
+        <label><span class="pin">●</span> 出發站　FROM</label>
+        <div class="combo" id="combo-from">
+          <input type="text" id="input-from" placeholder="輸入站名或代碼…" autocomplete="off" />
+          <div class="options" id="options-from"></div>
+        </div>
+      </div>
+      <div class="swap-cell">
+        <button class="swap" id="swap" title="互換出發 / 到達">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 4 L3 8 L7 12"/><path d="M3 8 H17"/><path d="M17 20 L21 16 L17 12"/><path d="M21 16 H7"/>
+          </svg>
+        </button>
+      </div>
+      <div class="field">
+        <label><span class="pin">●</span> 到達站　TO</label>
+        <div class="combo" id="combo-to">
+          <input type="text" id="input-to" placeholder="輸入站名或代碼…" autocomplete="off" />
+          <div class="options" id="options-to"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="board"><div class="board-inner" id="board"><div class="state">選擇兩站以查詢里程</div></div></div>
+  <footer id="footer"></footer>
+</div>
+
+<script>
+/* =========================================================================
+   資料模型
+   DATA[系統] = { name, short, official, lines:[ 路線 ] }
+   路線 = { key, label, color, circular, loopKm?, stations:[ {id,name,km,code?} ] }
+   兩站距離   = Math.abs(a.km - b.km)
+   環狀線距離 = Math.min(順時針, 逆時針)  // raw 與 loopKm-raw 取小
+
+   里程來源：
+   ● 台鐵(TRA)  ── 全線採「交通部臺鐵公司官方營業里程表 (mile.pdf, 1140508版)」真實里程。
+   ● 其餘系統  ── 站名/代碼/順序皆依官方資料；各站 km 為「估算值」(對齊官方路線總長)，標記 ~est。
+                   需精準里程時，以 TDX 運輸資料流通服務 (tdx.transportdata.tw) 覆蓋 km 欄位即可。
+   ========================================================================= */
+const DATA = {
+
+/* ===================== 台灣高鐵 THSR (12 站) ===================== */
+THSR:{ name:'台灣高鐵', short:'高鐵', official:false, lines:[
+  { key:'THSR', label:'高鐵主線', color:'#e76a1f', circular:false, stations:[
+    {id:'南港',km:0},   {id:'台北',km:9.3}, {id:'板橋',km:16},  {id:'桃園',km:42},
+    {id:'新竹',km:72},  {id:'苗栗',km:105},{id:'台中',km:159}, {id:'彰化',km:185},
+    {id:'雲林',km:210}, {id:'嘉義',km:252},{id:'台南',km:314}, {id:'左營',km:349.5}
+  ]} /* km 全為 ~est（對齊南港-左營約 349.5km） */
+]},
+
+/* ===================== 台鐵 TRA（官方營業里程） ===================== */
+TRA:{ name:'台鐵', short:'台鐵', official:true, lines:[
+  { key:'WT', label:'縱貫線（山線·基隆—高雄）', color:'#3f6fb0', circular:false, stations:[
+    {id:'基隆',km:0},{id:'三坑',km:1.5},{id:'八堵',km:3.9},{id:'七堵',km:6.2},{id:'百福',km:8.9},
+    {id:'五堵',km:11.9},{id:'汐止',km:13.3},{id:'汐科',km:14.6},{id:'南港',km:19.3},{id:'松山',km:22.1},
+    {id:'臺北',km:28.5},{id:'萬華',km:31.3},{id:'板橋',km:35.7},{id:'浮洲',km:38.1},{id:'樹林',km:41.1},
+    {id:'南樹林',km:43.1},{id:'山佳',km:45.0},{id:'鶯歌',km:49.4},{id:'鳳鳴',km:54.4},{id:'桃園',km:57.6},
+    {id:'內壢',km:63.5},{id:'中壢',km:67.5},{id:'埔心',km:73.3},{id:'楊梅',km:77.3},{id:'富岡',km:84.1},
+    {id:'新富',km:85.8},{id:'北湖',km:87.3},{id:'湖口',km:89.8},{id:'新豐',km:96.0},{id:'竹北',km:100.8},
+    {id:'北新竹',km:105.2},{id:'新竹',km:106.6},{id:'三姓橋',km:111.4},{id:'香山',km:114.6},{id:'崎頂',km:120.8},
+    {id:'竹南',km:125.3},{id:'造橋',km:130.7},{id:'豐富',km:136.6},{id:'苗栗',km:140.6},{id:'南勢',km:147.2},
+    {id:'銅鑼',km:151.4},{id:'三義',km:158.8},{id:'泰安',km:169.7},{id:'后里',km:172.3},{id:'豐原',km:179.0},
+    {id:'栗林',km:181.6},{id:'潭子',km:184.1},{id:'頭家厝',km:186.0},{id:'松竹',km:187.7},{id:'太原',km:189.5},
+    {id:'精武',km:191.2},{id:'臺中',km:193.1},{id:'五權',km:195.3},{id:'大慶',km:197.4},{id:'烏日',km:200.5},
+    {id:'新烏日',km:201.4},{id:'成功',km:203.8},{id:'彰化',km:210.9},{id:'花壇',km:217.5},{id:'大村',km:222.1},
+    {id:'員林',km:225.6},{id:'永靖',km:229.1},{id:'社頭',km:232.8},{id:'田中',km:237.1},{id:'二水',km:242.9},
+    {id:'林內',km:251.0},{id:'石榴',km:255.8},{id:'斗六',km:260.6},{id:'斗南',km:268.2},{id:'石龜',km:272.1},
+    {id:'大林',km:276.7},{id:'民雄',km:282.5},{id:'嘉北',km:289.2},{id:'嘉義',km:291.8},{id:'水上',km:298.4},
+    {id:'南靖',km:301.0},{id:'後壁',km:307.0},{id:'新營',km:314.7},{id:'柳營',km:318.0},{id:'林鳳營',km:321.9},
+    {id:'隆田',km:327.4},{id:'拔林',km:329.6},{id:'善化',km:334.2},{id:'南科',km:337.1},{id:'新市',km:341.8},
+    {id:'永康',km:346.8},{id:'大橋',km:350.5},{id:'臺南',km:353.2},{id:'保安',km:360.8},{id:'仁德',km:362.2},
+    {id:'中洲',km:364.7},{id:'大湖',km:367.6},{id:'路竹',km:370.6},{id:'岡山',km:378.4},{id:'橋頭',km:382.0},
+    {id:'楠梓',km:386.2},{id:'新左營',km:391.3},{id:'左營',km:393.3},{id:'內惟',km:394.4},{id:'美術館',km:396.1},
+    {id:'鼓山',km:397.3},{id:'三塊厝',km:399.0},{id:'高雄',km:399.9}
+  ]},
+  { key:'COAST', label:'縱貫線（海線·竹南—彰化）', color:'#3f6fb0', circular:false, stations:[
+    {id:'竹南',km:0},{id:'談文',km:4.5},{id:'大山',km:11.3},{id:'後龍',km:15.0},{id:'龍港',km:18.6},
+    {id:'白沙屯',km:26.7},{id:'新埔',km:29.8},{id:'通霄',km:35.6},{id:'苑裡',km:41.7},{id:'日南',km:49.4},
+    {id:'大甲',km:54.1},{id:'臺中港',km:59.3},{id:'清水',km:65.3},{id:'沙鹿',km:68.5},{id:'龍井',km:73.1},
+    {id:'大肚',km:78.1},{id:'追分',km:83.1},{id:'彰化',km:90.3}
+  ]},
+  { key:'YILAN', label:'宜蘭線（八堵—蘇澳新）', color:'#3f6fb0', circular:false, stations:[
+    {id:'八堵',km:0},{id:'暖暖',km:1.6},{id:'四腳亭',km:3.9},{id:'瑞芳',km:8.9},{id:'猴硐',km:13.5},
+    {id:'三貂嶺',km:16.0},{id:'牡丹',km:19.5},{id:'雙溪',km:22.9},{id:'貢寮',km:28.2},{id:'福隆',km:32.0},
+    {id:'石城',km:37.4},{id:'大里',km:40.1},{id:'大溪',km:44.8},{id:'龜山',km:49.4},{id:'外澳',km:52.9},
+    {id:'頭城',km:56.6},{id:'頂埔',km:58.8},{id:'礁溪',km:62.9},{id:'四城',km:67.6},{id:'宜蘭',km:71.3},
+    {id:'二結',km:77.1},{id:'中里',km:78.3},{id:'羅東',km:80.1},{id:'冬山',km:85.1},{id:'新馬',km:89.3},
+    {id:'蘇澳新',km:90.2}
+  ]},
+  { key:'NL', label:'北迴線（蘇澳新—花蓮）', color:'#3f6fb0', circular:false, stations:[
+    {id:'蘇澳新',km:0},{id:'永樂',km:5.2},{id:'東澳',km:10.9},{id:'南澳',km:18.9},{id:'武塔',km:22.6},
+    {id:'漢本',km:35.5},{id:'和平',km:39.9},{id:'和仁',km:47.8},{id:'崇德',km:57.8},{id:'新城',km:63.1},
+    {id:'景美',km:68.4},{id:'北埔',km:74.9},{id:'花蓮',km:79.5}
+  ]},
+  { key:'TT', label:'臺東線（花蓮—臺東）', color:'#3f6fb0', circular:false, stations:[
+    {id:'花蓮',km:0},{id:'吉安',km:3.5},{id:'志學',km:12.3},{id:'平和',km:15.3},{id:'壽豐',km:17.1},
+    {id:'豐田',km:19.9},{id:'林榮新光',km:26.1},{id:'南平',km:28.3},{id:'鳳林',km:32.5},{id:'萬榮',km:37.4},
+    {id:'光復',km:43.0},{id:'大富',km:50.5},{id:'富源',km:53.7},{id:'瑞穗',km:62.8},{id:'三民',km:72.2},
+    {id:'玉里',km:83.0},{id:'東里',km:89.8},{id:'東竹',km:95.8},{id:'富里',km:101.9},{id:'池上',km:108.7},
+    {id:'海端',km:114.4},{id:'關山',km:120.9},{id:'瑞和',km:128.4},{id:'瑞源',km:131.1},{id:'鹿野',km:136.6},
+    {id:'山里',km:142.7},{id:'臺東',km:150.9}
+  ]},
+  { key:'PT', label:'屏東線（高雄—枋寮）', color:'#3f6fb0', circular:false, stations:[
+    {id:'高雄',km:0},{id:'民族',km:1.3},{id:'科工館',km:2.4},{id:'正義',km:4.2},{id:'鳳山',km:5.5},
+    {id:'後庄',km:9.4},{id:'九曲堂',km:13.6},{id:'六塊厝',km:18.6},{id:'屏東',km:20.9},{id:'歸來',km:23.5},
+    {id:'麟洛',km:25.8},{id:'西勢',km:28.2},{id:'竹田',km:31.9},{id:'潮州',km:35.9},{id:'崁頂',km:40.8},
+    {id:'南州',km:43.2},{id:'鎮安',km:47.0},{id:'林邊',km:50.1},{id:'佳冬',km:54.0},{id:'東海',km:57.1},
+    {id:'枋寮',km:61.2}
+  ]},
+  { key:'SL', label:'南迴線（枋寮—臺東）', color:'#3f6fb0', circular:false, stations:[
+    {id:'枋寮',km:0},{id:'加祿',km:5.3},{id:'內獅',km:8.8},{id:'枋山',km:13.6},{id:'大武',km:43.8},
+    {id:'瀧溪',km:55.5},{id:'金崙',km:63.9},{id:'太麻里',km:74.8},{id:'知本',km:86.5},{id:'康樂',km:93.6},
+    {id:'臺東',km:98.1}
+  ]},
+  { key:'SAO', label:'蘇澳線（蘇澳新—蘇澳）', color:'#3f6fb0', circular:false, stations:[
+    {id:'蘇澳新',km:0},{id:'蘇澳',km:3.3}
+  ]},
+  { key:'PX', label:'平溪線（三貂嶺—菁桐）', color:'#3f6fb0', circular:false, stations:[
+    {id:'三貂嶺',km:0},{id:'大華',km:3.6},{id:'十分',km:6.4},{id:'望古',km:8.1},{id:'嶺腳',km:10.2},
+    {id:'平溪',km:11.2},{id:'菁桐',km:12.9}
+  ]},
+  { key:'SA', label:'深澳線（瑞芳—八斗子）', color:'#3f6fb0', circular:false, stations:[
+    {id:'瑞芳',km:0},{id:'海科館',km:4.3},{id:'八斗子',km:4.7}
+  ]},
+  { key:'NW', label:'內灣線（新竹—內灣）', color:'#3f6fb0', circular:false, stations:[
+    {id:'新竹',km:0},{id:'北新竹',km:1.4},{id:'千甲',km:3.6},{id:'新莊',km:6.6},{id:'竹中',km:7.9},
+    {id:'上員',km:10.6},{id:'榮華',km:15.0},{id:'竹東',km:16.6},{id:'橫山',km:20.1},{id:'九讚頭',km:22.1},
+    {id:'合興',km:24.3},{id:'富貴',km:25.7},{id:'內灣',km:27.9}
+  ]},
+  { key:'LJ', label:'六家線（竹中—六家）', color:'#3f6fb0', circular:false, stations:[
+    {id:'竹中',km:0},{id:'六家',km:3.1}
+  ]},
+  { key:'JJ', label:'集集線（二水—車埕）', color:'#3f6fb0', circular:false, stations:[
+    {id:'二水',km:0},{id:'源泉',km:3.0},{id:'濁水',km:10.8},{id:'龍泉',km:15.7},{id:'集集',km:20.0},
+    {id:'水里',km:27.4},{id:'車埕',km:29.6}
+  ]},
+  { key:'CZ', label:'成追線（成功—追分）', color:'#3f6fb0', circular:false, stations:[
+    {id:'成功',km:0},{id:'追分',km:2.2}
+  ]},
+  { key:'SLN', label:'沙崙線（中洲—沙崙）', color:'#3f6fb0', circular:false, stations:[
+    {id:'中洲',km:0},{id:'長榮大學',km:2.6},{id:'沙崙',km:5.7}
+  ]}
+]},
+
+/* ===================== 台北捷運 TRTC（6 大路線 + 支線） ===================== */
+TRTC:{ name:'台北捷運', short:'北捷', official:false, lines:[
+  { key:'R', label:'淡水信義線', color:'#e3002c', circular:false, stations:[
+    {code:'R28',id:'R28',name:'淡水',km:0},{code:'R27',id:'R27',name:'紅樹林',km:1.9},
+    {code:'R26',id:'R26',name:'竹圍',km:3.6},{code:'R25',id:'R25',name:'關渡',km:5.2},
+    {code:'R24',id:'R24',name:'忠義',km:6.6},{code:'R23',id:'R23',name:'復興崗',km:7.9},
+    {code:'R22',id:'R22',name:'北投',km:9.2},{code:'R21',id:'R21',name:'奇岩',km:10.2},
+    {code:'R20',id:'R20',name:'唭哩岸',km:11.1},{code:'R19',id:'R19',name:'石牌',km:12.1},
+    {code:'R18',id:'R18',name:'明德',km:13.0},{code:'R17',id:'R17',name:'芝山',km:14.0},
+    {code:'R16',id:'R16',name:'士林',km:15.1},{code:'R15',id:'R15',name:'劍潭',km:16.2},
+    {code:'R14',id:'R14',name:'圓山',km:17.2},{code:'R13',id:'R13',name:'民權西路',km:18.2},
+    {code:'R12',id:'R12',name:'雙連',km:19.1},{code:'R11',id:'R11',name:'中山',km:19.9},
+    {code:'R10',id:'R10',name:'台北車站',km:20.8},{code:'R09',id:'R09',name:'台大醫院',km:21.6},
+    {code:'R08',id:'R08',name:'中正紀念堂',km:22.6},{code:'R07',id:'R07',name:'東門',km:23.6},
+    {code:'R06',id:'R06',name:'大安森林公園',km:24.6},{code:'R05',id:'R05',name:'大安',km:25.5},
+    {code:'R04',id:'R04',name:'信義安和',km:26.8},{code:'R03',id:'R03',name:'台北101/世貿',km:28.4},
+    {code:'R02',id:'R02',name:'象山',km:30.2}
+  ]},
+  { key:'RX', label:'新北投支線', color:'#e3002c', circular:false, stations:[
+    {code:'R22',id:'R22x',name:'北投',km:0},{code:'R22A',id:'R22A',name:'新北投',km:1.2}
+  ]},
+  { key:'G', label:'松山新店線', color:'#008659', circular:false, stations:[
+    {code:'G01',id:'G01',name:'新店',km:0},{code:'G02',id:'G02',name:'新店區公所',km:1.0},
+    {code:'G03',id:'G03',name:'七張',km:1.9},{code:'G04',id:'G04',name:'大坪林',km:2.9},
+    {code:'G05',id:'G05',name:'景美',km:4.4},{code:'G06',id:'G06',name:'萬隆',km:5.4},
+    {code:'G07',id:'G07',name:'公館',km:6.6},{code:'G08',id:'G08',name:'台電大樓',km:7.6},
+    {code:'G09',id:'G09',name:'古亭',km:8.7},{code:'G10',id:'G10',name:'中正紀念堂',km:9.9},
+    {code:'G11',id:'G11',name:'小南門',km:10.8},{code:'G12',id:'G12',name:'西門',km:11.9},
+    {code:'G13',id:'G13',name:'北門',km:12.8},{code:'G14',id:'G14',name:'中山',km:14.0},
+    {code:'G15',id:'G15',name:'松江南京',km:15.0},{code:'G16',id:'G16',name:'南京復興',km:16.3},
+    {code:'G17',id:'G17',name:'台北小巨蛋',km:17.6},{code:'G18',id:'G18',name:'南京三民',km:19.0},
+    {code:'G19',id:'G19',name:'松山',km:21.3}
+  ]},
+  { key:'GX', label:'小碧潭支線', color:'#008659', circular:false, stations:[
+    {code:'G03',id:'G03x',name:'七張',km:0},{code:'G03A',id:'G03A',name:'小碧潭',km:1.9}
+  ]},
+  { key:'O_HL', label:'中和新蘆線（往迴龍）', color:'#f8b61c', circular:false, stations:[
+    {code:'O01',id:'O01',name:'南勢角',km:0},{code:'O02',id:'O02',name:'景安',km:1.4},
+    {code:'O03',id:'O03',name:'永安市場',km:2.6},{code:'O04',id:'O04',name:'頂溪',km:4.0},
+    {code:'O05',id:'O05',name:'古亭',km:5.4},{code:'O06',id:'O06',name:'東門',km:6.6},
+    {code:'O07',id:'O07',name:'忠孝新生',km:7.6},{code:'O08',id:'O08',name:'松江南京',km:8.6},
+    {code:'O09',id:'O09',name:'行天宮',km:9.6},{code:'O10',id:'O10',name:'中山國小',km:10.5},
+    {code:'O11',id:'O11',name:'民權西路',km:11.5},{code:'O12',id:'O12',name:'大橋頭',km:12.6},
+    {code:'O13',id:'O13',name:'台北橋',km:13.6},{code:'O14',id:'O14',name:'菜寮',km:14.7},
+    {code:'O15',id:'O15',name:'三重',km:15.7},{code:'O16',id:'O16',name:'先嗇宮',km:16.9},
+    {code:'O17',id:'O17',name:'頭前庄',km:18.1},{code:'O18',id:'O18',name:'新莊',km:19.5},
+    {code:'O19',id:'O19',name:'輔大',km:20.9},{code:'O20',id:'O20',name:'丹鳳',km:22.3},
+    {code:'O21',id:'O21',name:'迴龍',km:24.0}
+  ]},
+  { key:'O_LZ', label:'中和新蘆線（往蘆洲）', color:'#f8b61c', circular:false, stations:[
+    {code:'O01',id:'O01l',name:'南勢角',km:0},{code:'O02',id:'O02l',name:'景安',km:1.4},
+    {code:'O03',id:'O03l',name:'永安市場',km:2.6},{code:'O04',id:'O04l',name:'頂溪',km:4.0},
+    {code:'O05',id:'O05l',name:'古亭',km:5.4},{code:'O06',id:'O06l',name:'東門',km:6.6},
+    {code:'O07',id:'O07l',name:'忠孝新生',km:7.6},{code:'O08',id:'O08l',name:'松江南京',km:8.6},
+    {code:'O09',id:'O09l',name:'行天宮',km:9.6},{code:'O10',id:'O10l',name:'中山國小',km:10.5},
+    {code:'O11',id:'O11l',name:'民權西路',km:11.5},{code:'O12',id:'O12l',name:'大橋頭',km:12.6},
+    {code:'O50',id:'O50',name:'三重國小',km:13.7},{code:'O51',id:'O51',name:'徐匯中學',km:14.6},
+    {code:'O52',id:'O52',name:'三和國中',km:15.6},{code:'O53',id:'O53',name:'三民高中',km:16.6},
+    {code:'O54',id:'O54',name:'蘆洲',km:17.6}
+  ]},
+  { key:'BL', label:'板南線', color:'#0070bd', circular:false, stations:[
+    {code:'BL01',id:'BL01',name:'頂埔',km:0},{code:'BL02',id:'BL02',name:'永寧',km:1.2},
+    {code:'BL03',id:'BL03',name:'土城',km:2.5},{code:'BL04',id:'BL04',name:'海山',km:3.8},
+    {code:'BL05',id:'BL05',name:'亞東醫院',km:5.1},{code:'BL06',id:'BL06',name:'府中',km:6.5},
+    {code:'BL07',id:'BL07',name:'板橋',km:7.6},{code:'BL08',id:'BL08',name:'新埔',km:8.6},
+    {code:'BL09',id:'BL09',name:'江子翠',km:9.7},{code:'BL10',id:'BL10',name:'龍山寺',km:11.4},
+    {code:'BL11',id:'BL11',name:'西門',km:12.7},{code:'BL12',id:'BL12',name:'台北車站',km:13.9},
+    {code:'BL13',id:'BL13',name:'善導寺',km:14.8},{code:'BL14',id:'BL14',name:'忠孝新生',km:15.8},
+    {code:'BL15',id:'BL15',name:'忠孝復興',km:16.9},{code:'BL16',id:'BL16',name:'忠孝敦化',km:17.9},
+    {code:'BL17',id:'BL17',name:'國父紀念館',km:18.9},{code:'BL18',id:'BL18',name:'市政府',km:19.9},
+    {code:'BL19',id:'BL19',name:'永春',km:20.9},{code:'BL20',id:'BL20',name:'後山埤',km:22.0},
+    {code:'BL21',id:'BL21',name:'昆陽',km:23.5},{code:'BL22',id:'BL22',name:'南港',km:25.6},
+    {code:'BL23',id:'BL23',name:'南港展覽館',km:28.3}
+  ]},
+  { key:'BR', label:'文湖線', color:'#c48c31', circular:false, stations:[
+    {code:'BR01',id:'BR01',name:'動物園',km:0},{code:'BR02',id:'BR02',name:'木柵',km:1.0},
+    {code:'BR03',id:'BR03',name:'萬芳社區',km:1.9},{code:'BR04',id:'BR04',name:'萬芳醫院',km:2.7},
+    {code:'BR05',id:'BR05',name:'辛亥',km:3.6},{code:'BR06',id:'BR06',name:'麟光',km:4.5},
+    {code:'BR07',id:'BR07',name:'六張犁',km:5.5},{code:'BR08',id:'BR08',name:'科技大樓',km:6.4},
+    {code:'BR09',id:'BR09',name:'大安',km:7.2},{code:'BR10',id:'BR10',name:'忠孝復興',km:8.0},
+    {code:'BR11',id:'BR11',name:'南京復興',km:9.0},{code:'BR12',id:'BR12',name:'中山國中',km:9.9},
+    {code:'BR13',id:'BR13',name:'松山機場',km:11.0},{code:'BR14',id:'BR14',name:'大直',km:12.0},
+    {code:'BR15',id:'BR15',name:'劍南路',km:13.0},{code:'BR16',id:'BR16',name:'西湖',km:14.0},
+    {code:'BR17',id:'BR17',name:'港墘',km:14.9},{code:'BR18',id:'BR18',name:'文德',km:15.9},
+    {code:'BR19',id:'BR19',name:'內湖',km:17.0},{code:'BR20',id:'BR20',name:'大湖公園',km:18.2},
+    {code:'BR21',id:'BR21',name:'葫洲',km:19.3},{code:'BR22',id:'BR22',name:'東湖',km:20.5},
+    {code:'BR23',id:'BR23',name:'南港軟體園區',km:22.5},{code:'BR24',id:'BR24',name:'南港展覽館',km:25.7}
+  ]},
+  { key:'Y', label:'環狀線（第一階段）', color:'#f0c800', circular:false, stations:[
+    {code:'Y07',id:'Y07',name:'大坪林',km:0},{code:'Y08',id:'Y08',name:'十四張',km:1.2},
+    {code:'Y09',id:'Y09',name:'秀朗橋',km:2.3},{code:'Y10',id:'Y10',name:'景平',km:3.5},
+    {code:'Y11',id:'Y11',name:'景安',km:4.6},{code:'Y12',id:'Y12',name:'中和',km:5.7},
+    {code:'Y13',id:'Y13',name:'橋和',km:6.7},{code:'Y14',id:'Y14',name:'中原',km:7.7},
+    {code:'Y15',id:'Y15',name:'板新',km:8.9},{code:'Y16',id:'Y16',name:'板橋',km:9.9},
+    {code:'Y17',id:'Y17',name:'新埔民生',km:10.9},{code:'Y18',id:'Y18',name:'頭前庄',km:12.2},
+    {code:'Y19',id:'Y19',name:'幸福',km:13.4},{code:'Y20',id:'Y20',name:'新北產業園區',km:15.4}
+  ]} /* TRTC 各站 km 為 ~est（對齊各線官方營運長度） */
+]},
+
+/* ===================== 台中捷運 TMRT（綠線 18 站） ===================== */
+TMRT:{ name:'台中捷運', short:'中捷', official:false, lines:[
+  { key:'G', label:'綠線（烏日文心北屯線）', color:'#86c540', circular:false, stations:[
+    {code:'G0', id:'G0', name:'北屯總站',km:0},   {code:'G3', id:'G3', name:'舊社',km:1.0},
+    {code:'G4', id:'G4', name:'松竹',km:1.8},     {code:'G5', id:'G5', name:'四維國小',km:2.6},
+    {code:'G6', id:'G6', name:'崇德文心',km:3.5}, {code:'G7', id:'G7', name:'中清文心',km:4.4},
+    {code:'G8', id:'G8', name:'文華高中',km:5.3}, {code:'G8a',id:'G8a',name:'櫻花文心',km:6.0},
+    {code:'G9', id:'G9', name:'台中市政府',km:6.9},{code:'G10',id:'G10',name:'水安',km:7.7},
+    {code:'G10a',id:'G10a',name:'文心森林公園',km:8.4},{code:'G11',id:'G11',name:'南屯',km:9.3},
+    {code:'G12',id:'G12',name:'豐樂公園',km:10.2},{code:'G13',id:'G13',name:'大慶',km:11.4},
+    {code:'G14',id:'G14',name:'九張犁',km:12.4}, {code:'G15',id:'G15',name:'九德',km:13.6},
+    {code:'G16',id:'G16',name:'烏日',km:14.9},   {code:'G17',id:'G17',name:'台中高鐵站',km:16.71}
+  ]} /* km 為 ~est（對齊全長 16.71km） */
+]},
+
+/* ===================== 高雄捷運 KRTC（紅線 / 橘線） ===================== */
+KRTC:{ name:'高雄捷運', short:'高捷', official:false, lines:[
+  { key:'RED', label:'紅線', color:'#e2231a', circular:false, stations:[
+    {code:'R3', id:'R3', name:'小港',km:0},      {code:'R4', id:'R4', name:'高雄國際機場',km:1.3},
+    {code:'R4A',id:'R4A',name:'草衙',km:2.2},    {code:'R5', id:'R5', name:'前鎮高中',km:3.2},
+    {code:'R6', id:'R6', name:'凱旋',km:4.3},    {code:'R7', id:'R7', name:'獅甲',km:5.3},
+    {code:'R8', id:'R8', name:'三多商圈',km:6.3},{code:'R9', id:'R9', name:'中央公園',km:7.3},
+    {code:'R10',id:'R10',name:'美麗島',km:8.2},  {code:'R11',id:'R11',name:'高雄車站',km:9.2},
+    {code:'R12',id:'R12',name:'後驛',km:10.0},   {code:'R13',id:'R13',name:'凹子底',km:11.1},
+    {code:'R14',id:'R14',name:'巨蛋',km:12.0},   {code:'R15',id:'R15',name:'生態園區',km:12.9},
+    {code:'R16',id:'R16',name:'左營（高鐵）',km:14.3},{code:'R17',id:'R17',name:'世運',km:15.8},
+    {code:'R18',id:'R18',name:'油廠國小',km:17.4},{code:'R19',id:'R19',name:'楠梓科技園區',km:18.8},
+    {code:'R20',id:'R20',name:'後勁',km:20.0},   {code:'R21',id:'R21',name:'都會公園',km:21.6},
+    {code:'R22',id:'R22',name:'青埔',km:23.2},   {code:'R22A',id:'R22A',name:'橋頭糖廠',km:24.6},
+    {code:'R23',id:'R23',name:'橋頭火車站',km:26.0},{code:'R24',id:'R24',name:'岡山高醫',km:28.3},
+    {code:'RK1',id:'RK1',name:'岡山車站',km:31.1}
+  ]},
+  { key:'ORANGE', label:'橘線', color:'#f08300', circular:false, stations:[
+    {code:'O1', id:'O1', name:'哈瑪星',km:0},    {code:'O2', id:'O2', name:'鹽埕埔',km:0.9},
+    {code:'O4', id:'O4', name:'前金',km:2.1},    {code:'O5', id:'O5', name:'美麗島',km:3.2},
+    {code:'O6', id:'O6', name:'信義國小',km:4.0},{code:'O7', id:'O7', name:'文化中心',km:4.9},
+    {code:'O8', id:'O8', name:'五塊厝',km:5.8},  {code:'O9', id:'O9', name:'苓雅運動園區',km:6.7},
+    {code:'O10',id:'O10',name:'衛武營',km:7.7},  {code:'O11',id:'O11',name:'鳳山西站（高雄市議會）',km:8.9},
+    {code:'O12',id:'O12',name:'鳳山',km:10.0},   {code:'O13',id:'O13',name:'大東',km:10.9},
+    {code:'O14',id:'O14',name:'鳳山國中',km:11.9},{code:'OT1',id:'OT1',name:'大寮',km:14.4}
+  ]} /* km 為 ~est（紅線端點 R24=28.3 / RK1=31.1、橘線 14.4 對齊官方） */
+]},
+
+/* ===================== 高雄輕軌 KLRT（環狀線 38 站） ===================== */
+KLRT:{ name:'高雄輕軌', short:'高雄輕軌', official:false, lines:[
+  { key:'LOOP', label:'環狀線', color:'#7ac143', circular:true, loopKm:22.1, stations:[
+    {code:'C1', id:'C1', name:'籬仔內',km:0},   {code:'C2', id:'C2', name:'凱旋瑞田',km:0.6},
+    {code:'C3', id:'C3', name:'前鎮之星',km:1.2},{code:'C4', id:'C4', name:'凱旋中華',km:1.8},
+    {code:'C5', id:'C5', name:'夢時代',km:2.5}, {code:'C6', id:'C6', name:'經貿園區',km:3.1},
+    {code:'C7', id:'C7', name:'軟體園區',km:3.6},{code:'C8', id:'C8', name:'高雄展覽館',km:4.2},
+    {code:'C9', id:'C9', name:'旅運中心',km:4.8},{code:'C10',id:'C10',name:'光榮碼頭',km:5.4},
+    {code:'C11',id:'C11',name:'真愛碼頭',km:5.9},{code:'C12',id:'C12',name:'駁二大義',km:6.4},
+    {code:'C13',id:'C13',name:'駁二蓬萊',km:6.9},{code:'C14',id:'C14',name:'哈瑪星',km:7.5},
+    {code:'C15',id:'C15',name:'壽山公園',km:8.1},{code:'C16',id:'C16',name:'文武聖殿',km:8.7},
+    {code:'C17',id:'C17',name:'鼓山區公所',km:9.2},{code:'C18',id:'C18',name:'鼓山',km:9.8},
+    {code:'C19',id:'C19',name:'馬卡道',km:10.4},{code:'C20',id:'C20',name:'臺鐵美術館',km:11.0},
+    {code:'C21A',id:'C21A',name:'內惟藝術中心',km:11.6},{code:'C21',id:'C21',name:'美術館',km:12.3},
+    {code:'C22',id:'C22',name:'聯合醫院',km:12.9},{code:'C23',id:'C23',name:'龍華國小',km:13.5},
+    {code:'C24',id:'C24',name:'愛河之心',km:14.1},{code:'C25',id:'C25',name:'新上國小',km:14.7},
+    {code:'C26',id:'C26',name:'大順民族',km:15.3},{code:'C27',id:'C27',name:'灣仔內',km:15.9},
+    {code:'C28',id:'C28',name:'高雄高工',km:16.5},{code:'C29',id:'C29',name:'樹德家商',km:17.1},
+    {code:'C30',id:'C30',name:'科工館',km:17.7},{code:'C31',id:'C31',name:'聖功醫院',km:18.3},
+    {code:'C32',id:'C32',name:'凱旋公園',km:18.9},{code:'C33',id:'C33',name:'衛生局',km:19.5},
+    {code:'C34',id:'C34',name:'五權國小',km:20.1},{code:'C35',id:'C35',name:'凱旋武昌',km:20.7},
+    {code:'C36',id:'C36',name:'凱旋二聖',km:21.2},{code:'C37',id:'C37',name:'輕軌機廠',km:21.6}
+  ]} /* km 為 ~est（站距對齊輕軌 0.5–0.8km/站、全環 22.1km；C37→C1 閉合 0.5km） */
+]}
+
+};
+
+/* tab 順序 */
+const ORDER = ['THSR','TRA','TRTC','TMRT','KRTC','KLRT'];
+const TAB_COLOR = {THSR:'#e76a1f',TRA:'#3f6fb0',TRTC:'#e3002c',TMRT:'#86c540',KRTC:'#e2231a',KLRT:'#7ac143'};
+
+/* ===================== 狀態 ===================== */
+const state = { system:'TRA', lineKey:null, fromId:null, toId:null };
+
+function sys(){ return DATA[state.system]; }
+function activeLine(){ return sys().lines.find(l=>l.key===state.lineKey) || sys().lines[0]; }
+function stationName(s){ return s.name || s.id; }            /* 顯示名 */
+function stationLabel(s){ return s.code ? `${s.code}　${stationName(s)}` : stationName(s); }
+function isCode(str){ return /^[A-Za-z]{1,4}\d/.test(str); } /* 判斷是否為代碼(顯示圓牌) */
+
+/* ===================== 里程計算 ===================== */
+function distanceKm(line, fromId, toId){
+  const a=line.stations.find(s=>s.id===fromId), b=line.stations.find(s=>s.id===toId);
+  if(!a||!b) return null;
+  const raw=Math.abs(a.km-b.km);
+  return line.circular ? Math.min(raw, line.loopKm-raw) : raw;
+}
+function stationsBetween(line, fromId, toId){
+  const ia=line.stations.findIndex(s=>s.id===fromId), ib=line.stations.findIndex(s=>s.id===toId);
+  if(ia<0||ib<0) return 0;
+  if(!line.circular) return Math.abs(ia-ib);
+  const n=line.stations.length, fwd=(ib-ia+n)%n, bwd=(ia-ib+n)%n;
+  return Math.min(fwd,bwd);
+}
+
+/* ===================== Tabs ===================== */
+const tabsEl=document.getElementById('tabs');
+ORDER.forEach(key=>{
+  const b=document.createElement('button');
+  b.className='tab'; b.dataset.key=key;
+  b.innerHTML=`<span class="dot" style="background:${TAB_COLOR[key]}"></span>${DATA[key].name}`;
+  b.addEventListener('click',()=>selectSystem(key));
+  tabsEl.appendChild(b);
+});
+
+const routesEl=document.getElementById('routes');
+const noticeEl=document.getElementById('notice');
+
+function selectSystem(key){
+  state.system=key;
+  state.lineKey=DATA[key].lines[0].key;
+  state.fromId=null; state.toId=null;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.key===key));
+  renderRoutes();
+  if(accentFollowsLine) applyAccent(activeLine().color);
+  renderNotice();
+  resetCombo(comboFrom); resetCombo(comboTo);
+  renderBoard();
+}
+
+function renderRoutes(){
+  const lines=sys().lines;
+  routesEl.innerHTML='';
+  if(lines.length<=1){ routesEl.classList.remove('show'); return; }
+  routesEl.classList.add('show');
+  const lab=document.createElement('div'); lab.className='rlabel'; lab.textContent='選擇路線 / Line';
+  routesEl.appendChild(lab);
+  lines.forEach(l=>{
+    const btn=document.createElement('button');
+    btn.className='route'+(l.key===state.lineKey?' active':'');
+    btn.dataset.key=l.key;
+    btn.style.color = l.key===state.lineKey ? l.color : '';
+    btn.innerHTML=`<span class="dot" style="background:${l.color}"></span>${l.label}`;
+    btn.addEventListener('click',()=>selectLine(l.key));
+    routesEl.appendChild(btn);
+  });
+}
+
+function selectLine(lineKey){
+  state.lineKey=lineKey;
+  state.fromId=null; state.toId=null;
+  document.querySelectorAll('.route').forEach(r=>{
+    const on=r.dataset.key===lineKey;
+    r.classList.toggle('active',on);
+    const l=sys().lines.find(x=>x.key===r.dataset.key);
+    r.style.color = on ? l.color : '';
+  });
+  if(accentFollowsLine) applyAccent(activeLine().color);
+  resetCombo(comboFrom); resetCombo(comboTo);
+  renderBoard();
+}
+
+function renderNotice(){
+  const s=sys();
+  noticeEl.className='notice show';
+  if(s.official){
+    noticeEl.innerHTML=`<span class="tag" style="background:#3fb56e"></span>`+
+      `<b>${s.name}</b> 採用官方營業里程（臺鐵公司里程表），各站里程為實際值。`;
+  }else{
+    noticeEl.innerHTML=`<span class="tag" style="background:var(--accent)"></span>`+
+      `<b>${s.name}</b> 站名/代碼/順序依官方資料；各站 km 為估算值（已對齊官方路線總長），`+
+      `精準里程可用 <a href="https://tdx.transportdata.tw/" target="_blank" rel="noopener">TDX</a> 覆蓋。`;
+  }
+}
+
+/* 動態主色 */
+function applyAccent(color){
+  const c=resolveColor(color);
+  const root=document.documentElement.style;
+  root.setProperty('--accent',c);
+  root.setProperty('--accent-soft',hexToRgba(c,.15));
+  root.setProperty('--accent-line',hexToRgba(c,.5));
+}
+function resolveColor(v){
+  v=(v||'').trim();
+  const m=/^var\((--[a-z0-9-]+)\)$/i.exec(v);
+  if(m) return getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim()||v;
+  return v;
+}
+function hexToRgba(hex,a){
+  hex=(hex||'').replace('#','');
+  if(hex.length===3) hex=hex.split('').map(x=>x+x).join('');
+  const n=parseInt(hex,16);
+  if(isNaN(n)) return `rgba(232,177,58,${a})`;
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+function hexToHue(hex){
+  hex=(hex||'').replace('#','');
+  if(hex.length===3) hex=hex.split('').map(x=>x+x).join('');
+  const r=parseInt(hex.slice(0,2),16)/255, g=parseInt(hex.slice(2,4),16)/255, b=parseInt(hex.slice(4,6),16)/255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn; let h=0;
+  if(d){ if(mx===r) h=((g-b)/d)%6; else if(mx===g) h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; if(h<0)h+=360; }
+  return Math.round(h);
+}
+
+/* ===================== 主題引擎 ===================== */
+let accentFollowsLine = true;
+let themeState = { key:'auto', custom:'#e8b13a' };
+
+const DARK = {
+  '--bg':'#0d0f14','--bg-2':'#14171f','--panel':'#191d27','--panel-2':'#212633','--line':'#2c3340',
+  '--ink':'#f3f5f8','--ink-dim':'#9aa4b4','--ink-faint':'#5f6b7d',
+  '--chip-bg':'rgba(255,255,255,.05)','--glow-top':'rgba(255,255,255,.04)',
+  '--board-bg':'#0e1118','--board-bg2':'#0b0d12','--scan':'rgba(255,255,255,.012)',
+  '--board-ink':'#f3f5f8','--board-ink-dim':'#9aa4b4','--board-faint':'#5f6b7d'
+};
+const THEMES = {
+  auto:{ follow:true, vars:DARK },
+  cyber:{ follow:false, accent:'#ff2bd6', vars:{
+    '--bg':'#06040d','--bg-2':'#0c0820','--panel':'#130d2b','--panel-2':'#1b1340','--line':'#34245f',
+    '--ink':'#ecf7ff','--ink-dim':'#9a8fd6','--ink-faint':'#6a5fa0',
+    '--chip-bg':'rgba(180,120,255,.08)','--glow-top':'rgba(0,240,255,.06)',
+    '--board-bg':'#0a0618','--board-bg2':'#06030f','--scan':'rgba(120,200,255,.03)',
+    '--board-ink':'#ecf7ff','--board-ink-dim':'#b59be6','--board-faint':'#6a5fa0' }},
+  earth:{ follow:false, accent:'#b5651d', vars:{
+    '--bg':'#efe7d6','--bg-2':'#e6dac3','--panel':'#f6f0e4','--panel-2':'#ece1cf','--line':'#d6c6a9',
+    '--ink':'#382e22','--ink-dim':'#6f6150','--ink-faint':'#9a8c74',
+    '--chip-bg':'rgba(120,90,50,.08)','--glow-top':'rgba(181,101,29,.07)',
+    '--board-bg':'#2a2016','--board-bg2':'#1d150d','--scan':'rgba(255,240,210,.02)',
+    '--board-ink':'#f3e9d8','--board-ink-dim':'#c9b69a','--board-faint':'#8f7d63' }},
+  anime:{ follow:false, accent:'#ff5d9e', vars:{
+    '--bg':'#fdf2f8','--bg-2':'#f4e6f3','--panel':'#ffffff','--panel-2':'#fbecf5','--line':'#f0cfe2',
+    '--ink':'#2c2748','--ink-dim':'#6c6391','--ink-faint':'#a99dc4',
+    '--chip-bg':'rgba(255,120,180,.08)','--glow-top':'rgba(120,180,255,.07)',
+    '--board-bg':'#211a3a','--board-bg2':'#161029','--scan':'rgba(180,210,255,.025)',
+    '--board-ink':'#f3eeff','--board-ink-dim':'#c3b6e6','--board-faint':'#8e80b8' }}
+};
+/* 由自訂顏色生成「帶色調的深色」整套色盤 */
+function tintedDark(hex){
+  const h=hexToHue(hex);
+  return {
+    '--bg':`hsl(${h} 28% 6%)`,'--bg-2':`hsl(${h} 26% 9%)`,'--panel':`hsl(${h} 24% 12%)`,
+    '--panel-2':`hsl(${h} 22% 16%)`,'--line':`hsl(${h} 18% 25%)`,
+    '--ink':`hsl(${h} 25% 96%)`,'--ink-dim':`hsl(${h} 14% 68%)`,'--ink-faint':`hsl(${h} 12% 46%)`,
+    '--chip-bg':`hsla(${h} 40% 80% / .07)`,'--glow-top':'rgba(255,255,255,.04)',
+    '--board-bg':`hsl(${h} 30% 7%)`,'--board-bg2':`hsl(${h} 32% 4%)`,'--scan':'rgba(255,255,255,.012)',
+    '--board-ink':`hsl(${h} 20% 95%)`,'--board-ink-dim':`hsl(${h} 14% 66%)`,'--board-faint':`hsl(${h} 12% 46%)`
+  };
+}
+function applyVars(vars){ const r=document.documentElement.style; for(const k in vars) r.setProperty(k,vars[k]); }
+
+function setTheme(key){
+  themeState.key=key;
+  if(key==='custom'){
+    applyVars(tintedDark(themeState.custom));
+    accentFollowsLine=false;
+    applyAccent(themeState.custom);
+  }else{
+    const t=THEMES[key]||THEMES.auto;
+    applyVars(t.vars);
+    accentFollowsLine=!!t.follow;
+    applyAccent(t.follow ? activeLine().color : t.accent);
+  }
+  document.documentElement.style.setProperty('--custom-c', themeState.custom);
+  document.querySelectorAll('.sw').forEach(b=>b.classList.toggle('active', b.dataset.theme===key));
+}
+
+/* 主題列事件 */
+document.querySelectorAll('.sw[data-theme]').forEach(b=>{
+  b.addEventListener('click',()=>setTheme(b.dataset.theme));
+});
+const customInput=document.getElementById('customColor');
+customInput.addEventListener('input',()=>{ themeState.custom=customInput.value; setTheme('custom'); });
+
+
+/* ===================== Combobox ===================== */
+function makeCombo(comboId,inputId,optionsId,which){
+  const root=document.getElementById(comboId), input=document.getElementById(inputId), list=document.getElementById(optionsId);
+  let kbdIndex=-1;
+  const stations=()=>activeLine().stations;
+
+  function render(filter=''){
+    const f=filter.trim().toLowerCase();
+    const items=stations().filter(s=>{
+      if(!f) return true;
+      const nm=stationName(s).toLowerCase(), cd=(s.code||'').toLowerCase();
+      return nm.includes(f)||cd.includes(f);
+    });
+    list.innerHTML=''; kbdIndex=-1;
+    if(!items.length){ list.innerHTML=`<div class="opt-empty">查無符合車站</div>`; return; }
+    const accent=resolveColor(activeLine().color);
+    items.forEach(s=>{
+      const o=document.createElement('div'); o.className='opt'; o.dataset.id=s.id;
+      const badge = s.code && isCode(s.code)
+        ? `<span class="code" style="background:${accent}">${s.code}</span>`
+        : `<span class="pdot" style="background:${accent}"></span>`;
+      o.innerHTML=`${badge}<span class="nm">${stationName(s)}</span><span class="km">${s.km.toFixed(1)} km</span>`;
+      o.addEventListener('mousedown',e=>{e.preventDefault();choose(s);});
+      list.appendChild(o);
+    });
+  }
+  function choose(s){
+    if(which==='from') state.fromId=s.id; else state.toId=s.id;
+    input.value=stationLabel(s); root.classList.add('has-value'); close(); renderBoard();
+  }
+  function close(){ list.classList.remove('show'); }
+
+  input.addEventListener('focus',()=>{
+    if(root.classList.contains('has-value')){
+      input.value=''; root.classList.remove('has-value');
+      if(which==='from') state.fromId=null; else state.toId=null; renderBoard();
+    }
+    render(''); list.classList.add('show');
+  });
+  input.addEventListener('input',()=>{
+    root.classList.remove('has-value');
+    if(which==='from') state.fromId=null; else state.toId=null;
+    render(input.value); list.classList.add('show'); renderBoard();
+  });
+  input.addEventListener('keydown',e=>{
+    const opts=[...list.querySelectorAll('.opt')];
+    if(e.key==='ArrowDown'){e.preventDefault();kbdIndex=Math.min(kbdIndex+1,opts.length-1);paint(opts);}
+    else if(e.key==='ArrowUp'){e.preventDefault();kbdIndex=Math.max(kbdIndex-1,0);paint(opts);}
+    else if(e.key==='Enter'){if(opts[kbdIndex]) opts[kbdIndex].dispatchEvent(new MouseEvent('mousedown'));}
+    else if(e.key==='Escape'){close();input.blur();}
+  });
+  function paint(opts){opts.forEach((o,i)=>o.classList.toggle('kbd',i===kbdIndex));
+    if(opts[kbdIndex]) opts[kbdIndex].scrollIntoView({block:'nearest'});}
+  document.addEventListener('click',e=>{ if(!root.contains(e.target)) close(); });
+  return { reset(){input.value='';root.classList.remove('has-value');close();} };
+}
+function resetCombo(c){ c.reset(); }
+const comboFrom=makeCombo('combo-from','input-from','options-from','from');
+const comboTo  =makeCombo('combo-to','input-to','options-to','to');
+
+/* ===================== 互換 ===================== */
+document.getElementById('swap').addEventListener('click',()=>{
+  const line=activeLine(), f=state.fromId, t=state.toId;
+  state.fromId=t; state.toId=f;
+  applyComboValue('combo-from','input-from',line.stations.find(s=>s.id===state.fromId));
+  applyComboValue('combo-to','input-to',line.stations.find(s=>s.id===state.toId));
+  renderBoard();
+});
+function applyComboValue(comboId,inputId,s){
+  const root=document.getElementById(comboId), input=document.getElementById(inputId);
+  if(s){input.value=stationLabel(s);root.classList.add('has-value');}
+  else{input.value='';root.classList.remove('has-value');}
+}
+
+/* ===================== 結果看板 ===================== */
+const boardEl=document.getElementById('board');
+function badge(s,accent){
+  return s.code && isCode(s.code)
+    ? `<span class="code" style="background:${accent}">${s.code}</span>`
+    : `<span class="pdot" style="background:${accent}"></span>`;
+}
+function renderBoard(){
+  const line=activeLine();
+  const a=line.stations.find(s=>s.id===state.fromId), b=line.stations.find(s=>s.id===state.toId);
+  if(!a||!b){ boardEl.innerHTML=`<div class="state">選擇兩站以查詢里程</div>`; return; }
+  if(a.id===b.id){ boardEl.innerHTML=`<div class="state">出發站與到達站相同，里程為 0.0 公里</div>`; return; }
+  const km=distanceKm(line,a.id,b.id), stns=stationsBetween(line,a.id,b.id);
+  const accent=resolveColor(line.color);
+  boardEl.innerHTML=`
+    <div class="route-line">
+      <span class="stn">${badge(a,accent)}${stationName(a)}</span>
+      <span class="arrow">→</span>
+      <span class="stn">${badge(b,accent)}${stationName(b)}</span>
+    </div>
+    <div class="readout">${km.toFixed(1)}<span class="unit">公里</span></div>
+    <div class="meta">
+      <span><b>${sys().short} · ${line.label}</b></span>
+      <span>區間 <b>${stns}</b> 站${line.circular?'（最短）':''}</span>
+      ${line.circular?'<span><b>環狀線</b></span>':''}
+    </div>`;
+}
+
+/* ===================== Footer ===================== */
+document.getElementById('footer').innerHTML=
+  `里程公式：<code>|出發站.km − 到達站.km|</code>；環狀線取 <code>min(順時針, 逆時針)</code>。`+
+  `<br>台鐵為官方營業里程；其餘系統 km 為估算值（對齊官方路線總長），可用 `+
+  `<a href="https://tdx.transportdata.tw/" target="_blank" rel="noopener">TDX</a> 覆蓋為精準里程。`;
+
+/* ===================== 初始化 ===================== */
+selectSystem('TRA');
+setTheme('auto');
+</script>
+</body>
+</html>
