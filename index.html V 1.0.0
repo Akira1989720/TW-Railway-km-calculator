@@ -65,6 +65,37 @@ h1{font-family:"Bricolage Grotesque","Noto Sans TC",sans-serif;font-weight:800;
 .sw-ring::after{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--custom-c);
   box-shadow:inset 0 0 0 1px rgba(0,0,0,.25);}
 
+/* 分享按鈕 */
+/* 分享按鈕群組 */
+.share-group{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;}
+.soc{width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;display:grid;place-items:center;
+  color:#fff;padding:0;transition:transform .15s ease,filter .15s ease;}
+.soc:hover{transform:translateY(-2px);filter:brightness(1.08);}
+.soc svg{width:18px;height:18px;}
+.soc-line{background:#06C755;}
+.soc-threads{background:#000;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28);}
+.soc-ig{background:radial-gradient(circle at 30% 115%,#fdf497 0%,#fd5949 45%,#d6249f 70%,#285AEB 100%);}
+
+.share{appearance:none;border:1px solid var(--line);background:var(--panel);
+  color:var(--ink);font-family:inherit;font-weight:700;font-size:13px;padding:8px 14px;border-radius:20px;
+  cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .16s ease;white-space:nowrap;}
+.share:hover{border-color:var(--accent-line);background:var(--accent-soft);transform:translateY(-1px);}
+.share.copied{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent);}
+.share svg{width:15px;height:15px;}
+
+/* 提示 toast */
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);
+  background:var(--panel-2);color:var(--ink);border:1px solid var(--accent-line);
+  padding:11px 18px;border-radius:12px;font-size:13.5px;font-weight:500;z-index:90;
+  box-shadow:0 18px 40px -16px rgba(0,0,0,.7);opacity:0;pointer-events:none;
+  transition:opacity .22s ease,transform .22s ease;max-width:88vw;text-align:center;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* 頁尾署名 */
+.credit{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);color:var(--ink-faint);
+  font-size:12px;line-height:1.9;}
+.credit a{color:var(--accent);}
+
 .tabs{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0 0;}
 .tab{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink-dim);
   font-family:inherit;font-weight:700;font-size:14px;padding:10px 15px;border-radius:11px;cursor:pointer;
@@ -168,6 +199,35 @@ a{color:var(--accent);text-decoration:none;}
         <input type="color" id="customColor" value="#e8b13a" />
         <i class="sw-ring"></i>
       </label>
+      <div class="share-group">
+        <button class="soc soc-line" id="shareLine" title="分享到 LINE" aria-label="分享到 LINE">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 4C7 4 3 7.1 3 11c0 3.5 3.2 6.4 7.5 6.9v2.4c0 .3.3.5.6.3l4.2-2.6C19.2 16.7 21 14 21 11c0-3.9-4-7-9-7z"/>
+            <path d="M8 11h0M12 11h0M16 11h0" stroke-width="2.4"/>
+          </svg>
+        </button>
+        <button class="soc soc-threads" id="shareThreads" title="分享到 Threads" aria-label="分享到 Threads">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.166 1.43 1.781 3.631 2.695 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.36-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.74-1.757-.5-.582-1.27-.88-2.29-.886h-.027c-.819 0-1.929.225-2.636 1.273L9.6 8.527c.946-1.401 2.481-2.174 4.327-2.174h.045c3.086.02 4.926 1.916 5.108 5.225.105.045.207.092.31.141 1.4.66 2.426 1.658 2.985 2.926.81 1.84.84 4.85-1.495 7.14-1.786 1.751-3.953 2.514-6.974 2.535Zm1.327-9.585c-.354 0-.715.012-1.082.034-1.83.103-2.974.946-2.91 2.147.067 1.26 1.455 1.846 2.79 1.774 1.225-.066 2.825-.544 3.094-3.71a10.46 10.46 0 0 0-1.892-.245Z"/>
+          </svg>
+        </button>
+        <button class="soc soc-ig" id="shareIg" title="分享到 Instagram" aria-label="分享到 Instagram">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="4" width="16" height="16" rx="5"/>
+            <circle cx="12" cy="12" r="4"/>
+            <circle cx="17" cy="7" r="1.2" fill="currentColor" stroke="none"/>
+          </svg>
+        </button>
+        <button class="share" id="shareBtn" title="複製本頁網址分享給朋友">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <path d="M8.6 13.5 15.4 17.5"/><path d="M15.4 6.5 8.6 10.5"/>
+          </svg>
+          <span class="share-label">分享</span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -205,6 +265,7 @@ a{color:var(--accent);text-decoration:none;}
   <div class="board"><div class="board-inner" id="board"><div class="state">選擇兩站以查詢里程</div></div></div>
   <footer id="footer"></footer>
 </div>
+<div class="toast" id="toast"></div>
 
 <script>
 /* =========================================================================
@@ -494,6 +555,7 @@ KLRT:{ name:'高雄輕軌', short:'高雄輕軌', official:false, lines:[
 };
 
 /* tab 順序 */
+const VERSION = 'v1.1.0';   /* 版本：每次更新請一併調整（PATCH 修正 / MINOR 功能 / MAJOR 大改版） */
 const ORDER = ['THSR','TRA','TRTC','TMRT','KRTC','KLRT'];
 const TAB_COLOR = {THSR:'#e76a1f',TRA:'#3f6fb0',TRTC:'#e3002c',TMRT:'#86c540',KRTC:'#e2231a',KLRT:'#7ac143'};
 
@@ -797,7 +859,70 @@ function renderBoard(){
 document.getElementById('footer').innerHTML=
   `里程公式：<code>|出發站.km − 到達站.km|</code>；環狀線取 <code>min(順時針, 逆時針)</code>。`+
   `<br>台鐵為官方營業里程；其餘系統 km 為估算值（對齊官方路線總長），可用 `+
-  `<a href="https://tdx.transportdata.tw/" target="_blank" rel="noopener">TDX</a> 覆蓋為精準里程。`;
+  `<a href="https://tdx.transportdata.tw/" target="_blank" rel="noopener">TDX</a> 覆蓋為精準里程。`+
+  `<div class="credit">製作：Akira ｜ 聯絡方式：`+
+  `<a href="mailto:akira1989720@gmail.com">akira1989720@gmail.com</a> ｜ 版本：${VERSION}</div>`;
+
+/* ===================== 分享 ===================== */
+const SHARE_TITLE='台灣鐵路捷運里程查詢';
+function shareUrl(){ return window.location.href; }
+
+/* toast 提示 */
+let toastTimer=null;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2400);
+}
+
+/* 複製文字到剪貼簿（含舊版瀏覽器備援） */
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(e){
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok=document.execCommand('copy'); document.body.removeChild(ta); return ok;
+    }catch(_){ return false; }
+  }
+}
+
+/* 分享：一鍵複製網址 */
+const shareBtn=document.getElementById('shareBtn');
+shareBtn.addEventListener('click', async ()=>{
+  const ok=await copyText(shareUrl());
+  const label=shareBtn.querySelector('.share-label');
+  if(ok){ shareBtn.classList.add('copied'); label.textContent='已複製網址 ✓'; }
+  else  { label.textContent='請手動複製網址'; }
+  setTimeout(()=>{ shareBtn.classList.remove('copied'); label.textContent='分享'; }, 1900);
+});
+
+/* LINE：官方網頁分享連結 */
+document.getElementById('shareLine').addEventListener('click',()=>{
+  window.open('https://social-plugins.line.me/lineit/share?url='+encodeURIComponent(shareUrl()),
+    '_blank','noopener,width=620,height=680');
+});
+
+/* Threads：發文 intent（帶入標題＋網址） */
+document.getElementById('shareThreads').addEventListener('click',()=>{
+  const text=`${SHARE_TITLE} ${shareUrl()}`;
+  window.open('https://www.threads.net/intent/post?text='+encodeURIComponent(text),
+    '_blank','noopener,width=620,height=680');
+});
+
+/* Instagram：IG 無網頁帶連結機制 → 手機叫原生分享選單；桌機複製連結並開啟 IG */
+document.getElementById('shareIg').addEventListener('click', async ()=>{
+  if(navigator.share){
+    try{ await navigator.share({ title:SHARE_TITLE, url:shareUrl() }); return; }
+    catch(e){ if(e && e.name==='AbortError') return; /* 使用者取消 */ }
+  }
+  const ok=await copyText(shareUrl());
+  showToast(ok ? '已複製連結，貼到 IG 限動／個人簡介／私訊即可分享'
+               : '請手動複製網址後貼到 Instagram');
+  window.open('https://www.instagram.com/','_blank','noopener');
+});
 
 /* ===================== 初始化 ===================== */
 selectSystem('TRA');
